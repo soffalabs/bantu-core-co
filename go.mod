@@ -1,4 +1,4 @@
-module github.com/startupstation/bantu-core-go
+module github.com/startupstation/bantu-domain-go
 
 go 1.16
 
