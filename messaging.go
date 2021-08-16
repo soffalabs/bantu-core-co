@@ -8,7 +8,7 @@ package bantu
 
 const (
 	MessagingServiceId = "bantu-messaging"
-	MessagingSendEmailEvent = "bantu.messaging.send_email"
+	SendEmailEvent     = "bantu.messaging.send_email"
 )
 
 // ------------------------------------------------------------------------------------------------------------
