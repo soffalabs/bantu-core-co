@@ -32,7 +32,7 @@ type SendEmailInput struct {
 	From         EmailAddress `json:"from" binding:"required"`
 	Subject      string       `json:"subject" binding:"required"`
 	To           EmailAddress `json:"to" binding:"required"`
-	PlainContent string       `json:"plain_content" binding:"required_if=html_content ''"`
+	PlainContent string       `json:"plain_content"`
 	HtmlContent  string       `json:"html_content"`
 }
 
