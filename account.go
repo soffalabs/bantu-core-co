@@ -17,7 +17,8 @@ const (
 	AccountCreatedEvent            = "accounts.account_created"
 	AccountApplicationCreatedEvent = "accounts.application_created"
 
-	AccountServiceId = "bantu-accounts"
+	AccountServiceId      = "bantu-accounts"
+	RegistrationServiceId = "bantu-registration"
 )
 
 // ------------------------------------------------------------------------------------------------------------
