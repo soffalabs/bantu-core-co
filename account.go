@@ -1,38 +1,21 @@
 package bantu
 
-import "time"
-
-// ------------------------------------------------------------------------------------------------------------
-// Constants
-// ------------------------------------------------------------------------------------------------------------
+import (
+	"strings"
+	"time"
+)
 
 const (
-	AccountIdPrefix          string = "acc_"
-	AccountApiKeyPrefix             = "pk_"
-	AccountEventIdPrefix            = "ace_"
-	ApplicationIdPrefix             = "app_"
-	ApplicationTestKeyPrefix        = "sk_test_"
-	ApplicationLiveKeyPrefix        = "sk_live_"
+	AccountIdPrefix         string = "acc_"
+	AccountApiKeyPrefix            = "pk_"
+	AccountRootApiKeyPrefix        = "rpk_"
+	AccountEventIdPrefix           = "ace_"
 
-	AccountCreatedEvent            = "accounts.account_created"
-	AccountApplicationCreatedEvent = "accounts.application_created"
+	EventAccountCreated = "bantu.event.accounts.account_created"
 
 	AccountServiceId      = "bantu-accounts"
 	RegistrationServiceId = "bantu-registration"
 )
-
-// ------------------------------------------------------------------------------------------------------------
-// Tenants
-// ------------------------------------------------------------------------------------------------------------
-
-type Tenant struct {
-	Id        string    `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-// ------------------------------------------------------------------------------------------------------------
-// Accounts
-// ------------------------------------------------------------------------------------------------------------
 
 type Account struct {
 	Id        string    `json:"id"`
@@ -51,7 +34,7 @@ type AccountEvent struct {
 }
 
 type AccountCreated struct {
-	AccountId string `json:"account_id"`
+	Account Account `json:"account"`
 }
 
 type CreateAccountInput struct {
@@ -68,36 +51,8 @@ type GetAccountListOutput struct {
 	Accounts []Account `json:"accounts"`
 }
 
-// ------------------------------------------------------------------------------------------------------------
-// Applications
-// ------------------------------------------------------------------------------------------------------------
 
-type Application struct {
-	Id          string    `json:"id"`
-	AccountId   string    `json:"account_id"`
-	Name        string    `json:"name"`
-	Enabled     bool      `gorm:"not null"`
-	Description string    `json:"description"`
-	ApiKeyTest  string    `json:"api_key_test"`
-	ApiKeyLive  string    `json:"api_key_live"`
-	CreatedAt   time.Time `json:"created_at"`
+func (a Account) IsRoot() bool {
+	return strings.HasPrefix(a.ApiKey, AccountRootApiKeyPrefix)
 }
 
-type ApplicationCreated struct {
-	ApplicationId string `json:"application_id"`
-	AccountId     string `json:"account_id"`
-}
-
-type CreateApplicationInput struct {
-	AccountKey  string `json:"-"`
-	Name        string `json:"name" binding:"required"`
-	Description string `json:"description" binding:"required"`
-}
-
-type CreateApplicationOutput struct {
-	Application Application `json:"application"`
-}
-
-type GetApplicationListOutput struct {
-	Applications []Application `json:"applications"`
-}

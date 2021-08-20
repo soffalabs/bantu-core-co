@@ -1,19 +1,9 @@
 package bantu
 
-
-// ------------------------------------------------------------------------------------------------------------
-// Constants
-// ------------------------------------------------------------------------------------------------------------
-
-
 const (
 	MessagingServiceId = "bantu-messaging"
-	SendEmailEvent     = "bantu.messaging.send_email"
+	EventSendEmail     = "bantu.event.messaging.send_email"
 )
-
-// ------------------------------------------------------------------------------------------------------------
-// Email
-// ------------------------------------------------------------------------------------------------------------
 
 type EmailAddress struct {
 	Name    string `json:"name"`
@@ -36,7 +26,6 @@ type SendEmailInput struct {
 	HtmlContent  string       `json:"html_content"`
 }
 
-
 type SendEmailOutout struct {
 	Status MessageStatus `json:"status"`
 }
@@ -47,4 +36,3 @@ const (
 	MessageFailed  MessageStatus = "FAILED"
 	MessagePending               = "PENDING"
 )
-
