@@ -3,10 +3,11 @@ package bantu
 import "time"
 
 const (
-	ApplicationIdPrefix             = "app_"
-	ApplicationTestKeyPrefix        = "sk_test_"
-	ApplicationLiveKeyPrefix        = "sk_live_"
+	ApplicationIdPrefix      = "app_"
+	ApplicationTestKeyPrefix = "sk_test_"
+	ApplicationLiveKeyPrefix = "sk_live_"
 
+	ApplicationServiceId           = "bantu-applications"
 	EventAccountApplicationCreated = "bantu.event.accounts.application_created"
 )
 
@@ -22,12 +23,11 @@ type Application struct {
 }
 
 type ApplicationCreated struct {
-	ApplicationId string `json:"application_id"`
-	AccountId     string `json:"account_id"`
+	Application Application `json:"application"`
 }
 
 type CreateApplicationInput struct {
-	AccountKey  string `json:"-"`
+	AccountId   string `json:"-"`
 	Name        string `json:"name" binding:"required"`
 	Description string `json:"description" binding:"required"`
 }
