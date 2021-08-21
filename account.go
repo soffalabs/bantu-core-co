@@ -13,8 +13,8 @@ const (
 
 	EventAccountCreated = "bantu.event.accounts.account_created"
 
-	AccountServiceId      = "bantu-accounts"
-	RegistrationServiceId = "bantu-registration"
+	AccountServiceId      = "bantu-applications"
+	RegistrationServiceId = "bantu-accounts"
 )
 
 type Account struct {
