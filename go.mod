@@ -7,4 +7,4 @@ require (
 	github.com/soffa-io/soffa-core-go v0.0.12
 )
 
-replace github.com/soffa-io/soffa-core-go => ../soffa-core
+// replace github.com/soffa-io/soffa-core-go => ../soffa-core
