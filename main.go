@@ -68,7 +68,7 @@ func UseTenantsDataSource(app *sf.Application, primaryDb *sf.DataSource, migrati
 	return ds
 }
 
-func UserBroker(app *sf.Application, handler sf.MessageHandler) *sf.MessageBroker {
+func UseBroker(app *sf.Application, handler sf.MessageHandler) *sf.MessageBroker {
 	globalConfig := configureDefaults(app)
 	if broker, err := sf.ConnectToBroker(globalConfig.AmqpUrl); err != nil {
 		log.FatalErr(err)
