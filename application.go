@@ -15,7 +15,7 @@ type Application struct {
 	Id          string    `json:"id"`
 	AccountId   string    `json:"account_id"`
 	Name        string    `json:"name"`
-	Enabled     bool      `gorm:"not null"`
+	Enabled     bool      `json:"enabled"`
 	Description string    `json:"description"`
 	ApiKeyTest  string    `json:"api_key_test"`
 	ApiKeyLive  string    `json:"api_key_live"`

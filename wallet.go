@@ -1,5 +1,5 @@
 package bantu
 
 const (
-	WalletServiceId = "bantu-wallets"
+	WalletServiceId = "bantu-payments-gateways"
 )
