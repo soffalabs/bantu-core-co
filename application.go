@@ -49,10 +49,10 @@ type GetApplicationListOutput struct {
 // *********************************************************************************************************************
 
 type ApplicationRepo struct {
-	ds *sf.DataSource
+	ds *sf.EntityManager
 }
 
-func NewApplicationRepo(ds *sf.DataSource) *ApplicationRepo {
+func NewApplicationRepo(ds *sf.EntityManager) *ApplicationRepo {
 	return &ApplicationRepo{ds: ds}
 }
 

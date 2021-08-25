@@ -19,8 +19,8 @@ type Opts struct {
 }
 
 type Refs struct {
-	PrimaryDS  *sf.DataSource
-	TenantsDS  *sf.DataSource
+	PrimaryDS  *sf.EntityManager
+	TenantsDS  *sf.EntityManager
 	Broker     *sf.MessageBroker
 	NatsClient *sf.NatsClient
 }
@@ -42,7 +42,7 @@ func ConfigureDefaults(app *sf.Application, opts Opts) Refs {
 				refs.TenantsDS = app.AddDataSource("tenants", tenantsDbUrl, nil)
 			} else {
 				refs.PrimaryDS = app.AddDataSource("primary", databaseUrl, testMigrations(app))
-				refs.TenantsDS = app.AddMultitenanDataSource("tenants", tenantsDbUrl, opts.TenantMigrations,
+				refs.TenantsDS = app.AddDataSourceExt("tenants", tenantsDbUrl, opts.TenantMigrations,
 					func() ([]string, error) {
 						var tenants []string
 						return tenants, refs.PrimaryDS.Pluck("applications", "id", &tenants)
@@ -56,7 +56,7 @@ func ConfigureDefaults(app *sf.Application, opts Opts) Refs {
 		if refs.PrimaryDS == nil {
 			if opts.Migrations == nil {
 				refs.PrimaryDS = app.AddDataSource("primary", databaseUrl, testMigrations(app))
-			}else {
+			} else {
 				refs.PrimaryDS = app.AddDataSource("primary", databaseUrl, opts.Migrations)
 			}
 		}
@@ -109,7 +109,7 @@ func ConfigureDefaults(app *sf.Application, opts Opts) Refs {
 	return refs
 }
 
-func wraperMessageHandler(multitenant bool, handler sf.MessageHandler, ds *sf.DataSource) sf.MessageHandler {
+func wraperMessageHandler(multitenant bool, handler sf.MessageHandler, ds *sf.EntityManager) sf.MessageHandler {
 	if !multitenant {
 		return handler
 	}
@@ -180,5 +180,24 @@ func CreateTestBearerToken(t *testing.T, subject string, audience string) string
 	secret := os.Getenv("JWT_SECRET")
 	token, err := sf.CreateJwt(secret, "bantu", subject, audience, sf.H{})
 	assert.Nil(t, err)
-	return "bearer " + token
+	return token
 }
+
+func WrapController(handler func(req sf.Request, res sf.Response, ds sf.EntityManager)) func(req sf.Request, res sf.Response) {
+	return func(req sf.Request, res sf.Response) {
+		WithActiveTenant(req, res, func(ds sf.EntityManager) {
+			handler(req, res, ds)
+		})
+	}
+}
+
+func WithActiveTenant(req sf.Request, res sf.Response, cb func(ds sf.EntityManager)) {
+	err := req.Context.Application.GetNamedDataSource("tenants").WithTenant(req.Context.Username, func(ds sf.EntityManager) error {
+		cb(ds)
+		return nil
+	})
+	if err != nil {
+		res.Send(nil, err)
+	}
+}
+

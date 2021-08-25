@@ -57,10 +57,10 @@ func (a Account) IsRoot() bool {
 }
 
 type AccountRepo struct {
-	ds *sf.DataSource
+	ds *sf.EntityManager
 }
 
-func NewAccountRepo(ds *sf.DataSource) *AccountRepo {
+func NewAccountRepo(ds *sf.EntityManager) *AccountRepo {
 	return &AccountRepo{ds: ds}
 }
 
