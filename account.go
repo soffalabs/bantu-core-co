@@ -1,6 +1,7 @@
 package bantu
 
 import (
+	sf "github.com/soffa-io/soffa-core-go"
 	"strings"
 	"time"
 )
@@ -13,7 +14,8 @@ const (
 
 	EventAccountCreated = "bantu.event.accounts.account_created"
 
-	AccountServiceId      = "bantu-accounts"
+	AccountServiceId  = "bantu-accounts"
+	TestAccountApiKey = "acc_02901920192019201920"
 )
 
 type Account struct {
@@ -50,8 +52,23 @@ type GetAccountListOutput struct {
 	Accounts []Account `json:"accounts"`
 }
 
-
 func (a Account) IsRoot() bool {
 	return strings.HasPrefix(a.ApiKey, AccountRootApiKeyPrefix)
 }
 
+type AccountRepo struct {
+	ds *sf.DataSource
+}
+
+func NewAccountRepo(ds *sf.DataSource) *AccountRepo {
+	return &AccountRepo{ds: ds}
+}
+
+func (repo AccountRepo) FindByKey(key string) (*Account, error) {
+	account := &Account{}
+	found, err := repo.ds.QueryFirst(account, "api_key = ?", key)
+	if err != nil || !found {
+		return nil, err
+	}
+	return account, nil
+}

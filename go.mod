@@ -7,3 +7,5 @@ require (
 	github.com/soffa-io/soffa-core-go v0.1.1
 	gorm.io/gorm v1.21.13
 )
+
+replace github.com/soffa-io/soffa-core-go => ../soffa-core

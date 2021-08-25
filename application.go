@@ -1,6 +1,9 @@
 package bantu
 
-import "time"
+import (
+	sf "github.com/soffa-io/soffa-core-go"
+	"time"
+)
 
 const (
 	ApplicationIdPrefix      = "app_"
@@ -9,6 +12,9 @@ const (
 
 	ApplicationServiceId           = "bantu-applications"
 	EventAccountApplicationCreated = "bantu.event.accounts.application_created"
+
+	TestApplicationKeyTest = "sk_test_00000000000000000000"
+	TestApplicationKeyLive = "sk_live_00000000000000000000"
 )
 
 type Application struct {
@@ -38,4 +44,23 @@ type CreateApplicationOutput struct {
 
 type GetApplicationListOutput struct {
 	Applications []Application `json:"applications"`
+}
+
+// *********************************************************************************************************************
+
+type ApplicationRepo struct {
+	ds *sf.DataSource
+}
+
+func NewApplicationRepo(ds *sf.DataSource) *ApplicationRepo {
+	return &ApplicationRepo{ds: ds}
+}
+
+func (repo ApplicationRepo) FindByKey(key string) (*Application, error) {
+	app := &Application{}
+	found, err := repo.ds.QueryFirst(app, "api_key_test = ? OR api_key_live = ?", key, key)
+	if err != nil || !found {
+		return nil, err
+	}
+	return app, nil
 }
