@@ -2,6 +2,8 @@ package bantu
 
 import (
 	sf "github.com/soffa-io/soffa-core-go"
+	"github.com/soffa-io/soffa-core-go/commons"
+	"github.com/soffa-io/soffa-core-go/rpc"
 	"strings"
 	"time"
 )
@@ -16,6 +18,8 @@ const (
 
 	AccountServiceId  = "bantu-accounts"
 	TestAccountApiKey = "acc_02901920192019201920"
+
+	RpcGetAccountList = "bantu.accounts.GetAccountList"
 )
 
 type Account struct {
@@ -57,18 +61,49 @@ func (a Account) IsRoot() bool {
 }
 
 type AccountRepo struct {
-	ds *sf.EntityManager
-}
-
-func NewAccountRepo(ds *sf.EntityManager) *AccountRepo {
-	return &AccountRepo{ds: ds}
+	Db sf.DbLink
 }
 
 func (repo AccountRepo) FindByKey(key string) (*Account, error) {
 	account := &Account{}
-	found, err := repo.ds.QueryFirst(account, "api_key = ?", key)
+	found, err := repo.Db.QueryFirst(account, "api_key = ?", key)
 	if err != nil || !found {
 		return nil, err
 	}
 	return account, nil
 }
+
+type AccountRpc struct {
+	Client *rpc.Client
+}
+
+func (a AccountRpc) GetTenantsList() ([]string, error) {
+	data, err := a.Client.Request(RpcGetAccountList, sf.H{})
+	if err != nil {
+		return nil, err
+	}
+	if data == nil {
+		return nil, nil
+	}
+	var tenants []string
+	err = commons.DecodeBytes(data, &tenants)
+	return tenants, err
+}
+
+func (a AccountRpc) ProvideTenantsList(cb func() ([]string, error)) {
+	a.Client.Subscribe(RpcGetAccountList, func(msg rpc.BinaryMessage) error {
+		tenants, err := cb()
+		if err != nil {
+			return err
+		} else {
+			bytes, err := commons.GetBytes(tenants)
+			if err != nil {
+				msg.Reply(nil)
+				return err
+			}
+			msg.Reply(bytes)
+			return nil
+		}
+	})
+}
+

@@ -49,16 +49,12 @@ type GetApplicationListOutput struct {
 // *********************************************************************************************************************
 
 type ApplicationRepo struct {
-	ds *sf.EntityManager
-}
-
-func NewApplicationRepo(ds *sf.EntityManager) *ApplicationRepo {
-	return &ApplicationRepo{ds: ds}
+	Db sf.DbLink
 }
 
 func (repo ApplicationRepo) FindByKey(key string) (*Application, error) {
 	app := &Application{}
-	found, err := repo.ds.QueryFirst(app, "api_key_test = ? OR api_key_live = ?", key, key)
+	found, err := repo.Db.QueryFirst(app, "api_key_test = ? OR api_key_live = ?", key, key)
 	if err != nil || !found {
 		return nil, err
 	}

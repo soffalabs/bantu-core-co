@@ -3,196 +3,132 @@ package bantu
 import (
 	"github.com/go-gormigrate/gormigrate/v2"
 	sf "github.com/soffa-io/soffa-core-go"
+	"github.com/soffa-io/soffa-core-go/commons"
 	"github.com/soffa-io/soffa-core-go/log"
+	"github.com/soffa-io/soffa-core-go/rpc"
 	"github.com/stretchr/testify/assert"
-	"gorm.io/gorm"
 	"os"
+	"strings"
 	"testing"
 )
 
 type Opts struct {
-	MessageHandler   sf.MessageHandler
+	//MessageHandler   sf.MessageHandler
 	NoDatabase       bool
 	Migrations       []*gormigrate.Migration
 	TenantMigrations []*gormigrate.Migration
 	TenantsDb        bool
+	//ConfigureRpc     func(client *rpc.Client)
+	//CreateBroker     bool
 }
 
 type Refs struct {
-	PrimaryDS  *sf.EntityManager
-	TenantsDS  *sf.EntityManager
-	Broker     *sf.MessageBroker
-	NatsClient *sf.NatsClient
+	EntityManager        *sf.DbLink
+	TenantsEntityManager *sf.DbLink
+	Broker               *sf.MessageBroker
+	RpcClient            *rpc.Client
 }
 
 var (
 	TenantMigrationsCounter sf.Counter
+	//primary                      sf.DbLink
 )
 
-func ConfigureDefaults(app *sf.Application, opts Opts) Refs {
+const (
+	RpcClient string = "RpcClient"
+)
 
-	refs := Refs{}
+func CreateDbLinks(app *sf.ApplicationContext, mainMigrations []*gormigrate.Migration, tenantsMigrations []*gormigrate.Migration) []*sf.DbLink {
 
-	if !opts.NoDatabase {
-		databaseUrl := app.Conf("db.url", "DATABASE_URL", true)
+	var dbLinks []*sf.DbLink
 
-		if opts.TenantsDb || opts.TenantMigrations != nil {
-			tenantsDbUrl := app.Conf("db.tenants_url", "TENANTS_DATABASE_URL", true)
-			if opts.TenantMigrations == nil {
-				refs.TenantsDS = app.AddDataSource("tenants", tenantsDbUrl, nil)
-			} else {
-				refs.PrimaryDS = app.AddDataSource("primary", databaseUrl, testMigrations(app))
-				refs.TenantsDS = app.AddDataSourceExt("tenants", tenantsDbUrl, opts.TenantMigrations,
-					func() ([]string, error) {
-						var tenants []string
-						return tenants, refs.PrimaryDS.Pluck("applications", "id", &tenants)
-					})
+	databaseUrl := app.Conf("db.url", "DATABASE_URL", true)
 
-				brokerUrl := app.Conf("amqp.url", "AMQP_URL", true)
-				b := app.UseBroker(brokerUrl, app.Name, ExchangeName, wraperMessageHandler(true, opts.MessageHandler, refs.TenantsDS))
-				refs.Broker = &b
+	primary := &sf.DbLink{
+		ServiceName: strings.TrimPrefix(app.Name, "bantu-"),
+		Name:        PrimaryDbId,
+		Url:         databaseUrl,
+		Migrations:  mainMigrations,
+		//TenantsLoader: loader,
+	}
+	dbLinks = append(dbLinks, primary)
+
+	tenantsDbUrl := app.Conf("db.tenants_url", "TENANTS_DATABASE_URL", app.Name != "bantu-gateway")
+
+	if !commons.IsEmpty(tenantsDbUrl) {
+		var tenantsLoader sf.TenantsLoaderFn
+
+		if tenantsMigrations != nil {
+			tenantsLoader = func() ([]string, error) {
+				if app.IsTestEnv() {
+					return []string{"app01"}, nil
+				}
+				panic("TODO")
 			}
+
 		}
-		if refs.PrimaryDS == nil {
-			if opts.Migrations == nil {
-				refs.PrimaryDS = app.AddDataSource("primary", databaseUrl, testMigrations(app))
-			} else {
-				refs.PrimaryDS = app.AddDataSource("primary", databaseUrl, opts.Migrations)
-			}
+		tenants := &sf.DbLink{
+			ServiceName:   strings.TrimPrefix(app.Name, "bantu-"),
+			Name:          TenantsDbId,
+			Url:           tenantsDbUrl,
+			Migrations:    tenantsMigrations,
+			TenantsLoader: tenantsLoader,
 		}
+		dbLinks = append(dbLinks, tenants)
 	}
 
-	if opts.MessageHandler != nil && refs.Broker == nil {
-		brokerUrl := app.Conf("amqp.url", "AMQP_URL", true)
-		b := app.UseBroker(brokerUrl, app.Name, ExchangeName, wraperMessageHandler(opts.TenantMigrations != nil, opts.MessageHandler, refs.TenantsDS))
-		refs.Broker = &b
-	}
+	return dbLinks
 
-	natsUrl := app.Conf("nats.url", "NATS_URL", false)
+}
 
-	if !sf.IsStrEmpty(natsUrl) {
-		nc := sf.ConnectToNats(natsUrl, app.Name)
-		if opts.MessageHandler != nil {
-			log.FatalErr(nc.Subscribe(app.Name, opts.MessageHandler))
-			log.FatalErr(nc.Subscribe(ExchangeName, opts.MessageHandler))
-		}
-		refs.NatsClient = nc
-	}
-
-	jwtSecret := app.Conf("jwt.secret", "JWT_SECRET", true)
-	if app.Name == "bantu-accounts" {
-		app.Router().SetJwtSettings(jwtSecret, "account")
+func ConfigureRpcClient(context *sf.ApplicationContext, cb func(*sf.ApplicationContext, *rpc.Client)) {
+	natsUrl := context.Conf("nats.url", "NATS_URL", false)
+	if !commons.IsStrEmpty(natsUrl) {
+		nc := rpc.ConnectToNats(natsUrl, context.Name)
+		cb(context, nc)
+		context.Set(RpcClient, nc)
 	} else {
-		app.Router().SetJwtSettings(jwtSecret, "application")
-	}
-	if refs.PrimaryDS != nil {
-		accountRepo := NewAccountRepo(refs.PrimaryDS)
-		applicationRepo := NewApplicationRepo(refs.PrimaryDS)
-
-		app.Router().SetAuthenticator(func(username string, _ string) (*sf.Authentication, error) {
-			if app.Name == "bantu-accounts" {
-				a, err := accountRepo.FindByKey(username)
-				if err != nil || a == nil {
-					return nil, nil
-				}
-				return &sf.Authentication{Username: username, Principal: a}, nil
-			} else {
-				a, err := applicationRepo.FindByKey(username)
-				if err != nil || a == nil {
-					return nil, nil
-				}
-				return &sf.Authentication{Username: username, Principal: a}, nil
-			}
-		})
-	}
-
-	return refs
-}
-
-func wraperMessageHandler(multitenant bool, handler sf.MessageHandler, ds *sf.EntityManager) sf.MessageHandler {
-	if !multitenant {
-		return handler
-	}
-	return func(message sf.Message) error {
-		if EventAccountApplicationCreated == message.Event {
-
-			var event ApplicationCreated
-			if err := sf.Convert(message.Payload, &event); err != nil {
-				return err
-			}
-			err := ds.Migrate(&event.Application.Id)
-			_ = TenantMigrationsCounter.Record(err)
-			return err
-
-		} else if handler != nil {
-			return handler(message)
-		}
-		return nil
+		log.Warn("NATS_URL is missing, skipping configuration.")
 	}
 }
 
-func testMigrations(app *sf.Application) []*gormigrate.Migration {
-	if !app.IsTestEnv() {
-		return nil
-	}
+func ConfigureRouter(router *sf.AppRouter) {
+	jwtSecret := router.App.Conf("jwt.secret", "JWT_SECRET", true)
 
-	// This table is not owned by this service so we need to fake it for the tests to go green.
-	return []*gormigrate.Migration{
-		{
-			ID: "0_Accounts",
-			Migrate: func(tx *gorm.DB) error {
-				if app.Name == "bantu-accounts" {
-					return nil
-				}
-				type Account struct {
-					Id     string `gorm:"primaryKey;not null"`
-					ApiKey string `gorm:"not null"`
-				}
-				err := tx.Migrator().CreateTable(&Account{})
-				if err != nil {
-					return err
-				}
-				return tx.Create(&Account{Id: "ac_test_01", ApiKey: TestAccountApiKey}).Error
-			},
-		},
-		{
-			ID: "1_CreateApplications",
-			Migrate: func(tx *gorm.DB) error {
-				type Application struct {
-					Id         string `gorm:"primaryKey;not null"`
-					ApiKeyTest string `gorm:"not null"`
-					ApiKeyLive string `gorm:"not null"`
-				}
-				if err := tx.Migrator().CreateTable(&Application{}); err != nil {
-					return nil
-				}
-				return tx.Create(&Application{
-					Id:         "app01",
-					ApiKeyTest: TestApplicationKeyTest,
-					ApiKeyLive: TestApplicationKeyLive,
-				}).Error
-			},
-		},
+	if router.App.Name == "bantu-accounts" {
+		router.SetJwtSettings(jwtSecret, "account")
+	} else {
+		router.JwtAuth()
+		router.SetJwtSettings(jwtSecret, "application")
+	}
+}
+
+func BrokerInfo(app *sf.ApplicationContext, handler sf.MessageHandler, tenant bool) sf.BrokerInfo {
+	brokerUrl := app.Conf("amqp.url", "AMQP_URL", true)
+	if tenant {
+		handler = WrapMessageHandler(handler)
+	}
+	if handler == nil {
+		log.Fatal("No handler was provided")
+	}
+	return sf.BrokerInfo{
+		Url:      brokerUrl,
+		Queue:    app.Name,
+		Exchange: ExchangeName,
+		Handler:  handler,
 	}
 }
 
 func CreateTestBearerToken(t *testing.T, subject string, audience string) string {
 	secret := os.Getenv("JWT_SECRET")
+	sf.AssertNotEmpty(secret, "JWT_SECRET is missing")
 	token, err := sf.CreateJwt(secret, "bantu", subject, audience, sf.H{})
 	assert.Nil(t, err)
 	return token
 }
 
-func WrapController(handler func(req sf.Request, res sf.Response, ds sf.EntityManager)) func(req sf.Request, res sf.Response) {
-	return func(req sf.Request, res sf.Response) {
-		WithActiveTenant(req, res, func(ds sf.EntityManager) {
-			handler(req, res, ds)
-		})
-	}
-}
-
-func WithActiveTenant(req sf.Request, res sf.Response, cb func(ds sf.EntityManager)) {
-	err := req.Context.Application.GetNamedDataSource("tenants").WithTenant(req.Context.Username, func(ds sf.EntityManager) error {
+func WithActiveTenant(req sf.Request, res sf.Response, cb func(ds sf.DbLink)) {
+	err := req.Context.GetDbLink(TenantsDbId).WithTenant(req.Auth().Username, func(ds sf.DbLink) error {
 		cb(ds)
 		return nil
 	})
@@ -201,3 +137,22 @@ func WithActiveTenant(req sf.Request, res sf.Response, cb func(ds sf.EntityManag
 	}
 }
 
+ func WrapMessageHandler(handler sf.MessageHandler) sf.MessageHandler {
+	return func(context *sf.ApplicationContext, message sf.Message) error {
+		if EventAccountApplicationCreated == message.Event {
+
+			var event ApplicationCreated
+			if err := sf.Convert(message.Payload, &event); err != nil {
+				return err
+			}
+			db := context.GetDbLink(TenantsDbId)
+			err := db.Migrate(&event.Application.Id)
+			_ = TenantMigrationsCounter.Record(err)
+			return err
+
+		} else if handler != nil {
+			return handler(context, message)
+		}
+		return nil
+	}
+}
