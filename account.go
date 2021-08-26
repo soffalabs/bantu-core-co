@@ -2,7 +2,8 @@ package bantu
 
 import (
 	sf "github.com/soffa-io/soffa-core-go"
-	"github.com/soffa-io/soffa-core-go/commons"
+	"github.com/soffa-io/soffa-core-go/h"
+	"github.com/soffa-io/soffa-core-go/log"
 	"github.com/soffa-io/soffa-core-go/rpc"
 	"strings"
 	"time"
@@ -17,9 +18,23 @@ const (
 	EventAccountCreated = "bantu.event.accounts.account_created"
 
 	AccountServiceId  = "bantu-accounts"
-	TestAccountApiKey = "acc_02901920192019201920"
+	TestAccountApiKey = "pk_02901920192019201920"
 
-	RpcGetAccountList = "bantu.accounts.GetAccountList"
+	AccountRpcClientAttribute = "bantu.accounts.rpc.client"
+	GetTenantsList            = "bantu.accounts.GetTenantsList"
+	FindAccountByKey          = "bantu.accounts.FindByKey"
+	FindApplicationByKey      = "bantu.accounts.FindApplicationByKey"
+
+	ApplicationIdPrefix      = "app_"
+	ApplicationKeyPrefix     = "sk_"
+	ApplicationTestKeyPrefix = "sk_test_"
+	ApplicationLiveKeyPrefix = "sk_live_"
+
+	ApplicationServiceId           = "bantu-applications"
+	EventAccountApplicationCreated = "bantu.event.accounts.application_created"
+
+	TestApplicationKeyTest = "sk_test_00000000000000000000"
+	TestApplicationKeyLive = "sk_live_00000000000000000000"
 )
 
 type Account struct {
@@ -60,50 +75,134 @@ func (a Account) IsRoot() bool {
 	return strings.HasPrefix(a.ApiKey, AccountRootApiKeyPrefix)
 }
 
-type AccountRepo struct {
-	Db sf.DbLink
+type Application struct {
+	Id          string    `json:"id"`
+	AccountId   string    `json:"account_id"`
+	Name        string    `json:"name"`
+	Enabled     bool      `json:"enabled"`
+	Description string    `json:"description"`
+	ApiKeyTest  string    `json:"api_key_test"`
+	ApiKeyLive  string    `json:"api_key_live"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
-func (repo AccountRepo) FindByKey(key string) (*Account, error) {
-	account := &Account{}
-	found, err := repo.Db.QueryFirst(account, "api_key = ?", key)
-	if err != nil || !found {
-		return nil, err
-	}
-	return account, nil
+type ApplicationCreated struct {
+	Application Application `json:"application"`
+}
+
+type CreateApplicationInput struct {
+	AccountId   string `json:"-"`
+	Name        string `json:"name" binding:"required"`
+	Description string `json:"description" binding:"required"`
+}
+
+type CreateApplicationOutput struct {
+	Application Application `json:"application"`
+}
+
+type GetApplicationListOutput struct {
+	Applications []Application `json:"applications"`
 }
 
 type AccountRpc struct {
-	Client *rpc.Client
+	client rpc.Client
 }
 
-func (a AccountRpc) GetTenantsList() ([]string, error) {
-	data, err := a.Client.Request(RpcGetAccountList, sf.H{})
+type AccountRpcServer interface {
+	FindAccountByKey(key string) (*Account, error)
+	FindApplicationByKey(key string) (*Application, error)
+	GetTenantsList() ([]string, error)
+}
+
+// *********************************************************************************************************************
+
+func GetAccountRpc(context *sf.ApplicationContext) AccountRpc{
+	return AccountRpc{client: context.GetRpcClient()}
+}
+
+
+func (a AccountRpc) Serve(impl AccountRpcServer) {
+
+	a.client.ServeAll([]string{FindAccountByKey, FindApplicationByKey}, func(op string, data []byte) (interface{}, error) {
+		var input map[string]interface{}
+		if err := h.DecodeBytes(data, &input); err != nil {
+			return nil, err
+		}
+		key := input["key"].(string)
+		if op == FindAccountByKey {
+			return impl.FindAccountByKey(key)
+		} else {
+			return impl.FindApplicationByKey(key)
+		}
+	})
+	a.client.Serve(GetTenantsList, func(_ string, _ []byte) (interface{}, error) {
+		return impl.GetTenantsList()
+	})
+
+}
+
+func NewAccountRpcClient(ctx *sf.ApplicationContext) AccountRpc {
+	return AccountRpc{client: ctx.GetRpcClient()}
+}
+
+func (a AccountRpc) FindAccountByKey(key string) (*Account, error) {
+	var result *Account
+	err := a.client.Request(FindAccountByKey, sf.H{"key": key}, &result)
 	if err != nil {
 		return nil, err
 	}
-	if data == nil {
-		return nil, nil
+	return result, nil
+}
+
+func (a AccountRpc) FindApplicationByKey(key string) (*Application, error) {
+	var result *Application
+	err := a.client.Request(FindApplicationByKey, sf.H{"key": key}, &result)
+	if err != nil {
+		log.Error(err)
 	}
+	if err != nil || h.IsNil(result) {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (a AccountRpc) GetTenantsList() ([]string, error) {
 	var tenants []string
-	err = commons.DecodeBytes(data, &tenants)
+	err := a.client.Request(GetTenantsList, sf.H{}, &tenants)
 	return tenants, err
 }
 
-func (a AccountRpc) ProvideTenantsList(cb func() ([]string, error)) {
-	a.Client.Subscribe(RpcGetAccountList, func(msg rpc.BinaryMessage) error {
-		tenants, err := cb()
-		if err != nil {
-			return err
-		} else {
-			bytes, err := commons.GetBytes(tenants)
-			if err != nil {
-				msg.Reply(nil)
-				return err
-			}
-			msg.Reply(bytes)
-			return nil
-		}
-	})
+type TestAccounRpcServerImpl struct {
+	AccountRpcServer
 }
+
+func (s TestAccounRpcServerImpl) FindAccountByKey(key string) (*Account, error) {
+	if key == TestAccountApiKey {
+		return &Account{
+			Id:        "acc_001",
+			Name:      "Test",
+			ApiKey:    key,
+			CreatedAt: time.Now(),
+		}, nil
+	}
+	return nil, nil
+}
+
+func (s TestAccounRpcServerImpl) FindApplicationByKey(key string) (*Application, error) {
+	if key == TestApplicationKeyTest || key == TestApplicationKeyLive {
+		return &Application{
+			Id:         "app_001",
+			Name:       "Test",
+			ApiKeyLive: key,
+			ApiKeyTest: key,
+			CreatedAt:  time.Now(),
+		}, nil
+	}
+	return nil, nil
+}
+
+func (s TestAccounRpcServerImpl) GetTenantsList() ([]string, error) {
+	return []string{"app_001"}, nil
+}
+
 

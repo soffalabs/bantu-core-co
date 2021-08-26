@@ -24,7 +24,7 @@ require (
 	github.com/nats-io/nats.go v1.12.0 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
-	github.com/soffa-io/soffa-core-go v0.1.6
+	github.com/soffa-io/soffa-core-go v0.1.7
 	github.com/spf13/cobra v1.2.1 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/swaggo/swag v1.7.1 // indirect
@@ -44,4 +44,4 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 )
 
-// replace github.com/soffa-io/soffa-core-go => ../soffa-core
+//replace github.com/soffa-io/soffa-core-go => ../soffa-core

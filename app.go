@@ -3,7 +3,7 @@ package bantu
 import (
 	"github.com/go-gormigrate/gormigrate/v2"
 	sf "github.com/soffa-io/soffa-core-go"
-	"github.com/soffa-io/soffa-core-go/commons"
+	"github.com/soffa-io/soffa-core-go/h"
 	"github.com/soffa-io/soffa-core-go/log"
 	"github.com/soffa-io/soffa-core-go/rpc"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +18,7 @@ type Opts struct {
 	Migrations       []*gormigrate.Migration
 	TenantMigrations []*gormigrate.Migration
 	TenantsDb        bool
-	//ConfigureRpc     func(client *rpc.Client)
+	//ConfigureRpc     func(client *rpc.client)
 	//CreateBroker     bool
 }
 
@@ -34,41 +34,38 @@ var (
 	//primary                      sf.DbLink
 )
 
-const (
-	RpcClient string = "RpcClient"
-)
 
-func CreateDbLinks(app *sf.ApplicationContext, mainMigrations []*gormigrate.Migration, tenantsMigrations []*gormigrate.Migration) []*sf.DbLink {
+func CreateDbLinks(context *sf.ApplicationContext, mainMigrations []*gormigrate.Migration, tenantsMigrations []*gormigrate.Migration) []*sf.DbLink {
 
 	var dbLinks []*sf.DbLink
 
-	databaseUrl := app.Conf("db.url", "DATABASE_URL", true)
+	if mainMigrations != nil {
+		databaseUrl := context.Conf("db.url", "DATABASE_URL", true)
 
-	primary := &sf.DbLink{
-		ServiceName: strings.TrimPrefix(app.Name, "bantu-"),
-		Name:        PrimaryDbId,
-		Url:         databaseUrl,
-		Migrations:  mainMigrations,
-		//TenantsLoader: loader,
+		primary := &sf.DbLink{
+			ServiceName: strings.TrimPrefix(context.Name, "bantu-"),
+			Name:        PrimaryDbId,
+			Url:         databaseUrl,
+			Migrations:  mainMigrations,
+			//TenantsLoader: loader,
+		}
+		dbLinks = append(dbLinks, primary)
 	}
-	dbLinks = append(dbLinks, primary)
 
-	tenantsDbUrl := app.Conf("db.tenants_url", "TENANTS_DATABASE_URL", app.Name != "bantu-gateway")
+	tenantsDbUrl := context.Conf("db.tenants_url", "TENANTS_DATABASE_URL", context.Name != "bantu-gateway")
 
-	if !commons.IsEmpty(tenantsDbUrl) {
+	if !h.IsEmpty(tenantsDbUrl) {
 		var tenantsLoader sf.TenantsLoaderFn
 
 		if tenantsMigrations != nil {
 			tenantsLoader = func() ([]string, error) {
-				if app.IsTestEnv() {
-					return []string{"app01"}, nil
-				}
-				panic("TODO")
+				accountRpc := GetAccountRpc(context)
+				return accountRpc.GetTenantsList()
 			}
-
 		}
+
 		tenants := &sf.DbLink{
-			ServiceName:   strings.TrimPrefix(app.Name, "bantu-"),
+			ServiceName:   strings.TrimPrefix(context.Name, "bantu-"),
 			Name:          TenantsDbId,
 			Url:           tenantsDbUrl,
 			Migrations:    tenantsMigrations,
@@ -81,21 +78,17 @@ func CreateDbLinks(app *sf.ApplicationContext, mainMigrations []*gormigrate.Migr
 
 }
 
-func ConfigureRpcClient(context *sf.ApplicationContext, cb func(*sf.ApplicationContext, *rpc.Client)) {
-	natsUrl := context.Conf("nats.url", "NATS_URL", false)
-	if !commons.IsStrEmpty(natsUrl) {
-		nc := rpc.ConnectToNats(natsUrl, context.Name)
-		cb(context, nc)
-		context.Set(RpcClient, nc)
-	} else {
-		log.Warn("NATS_URL is missing, skipping configuration.")
+func Init(context *sf.ApplicationContext, router *sf.Router) {
+	rpcUrl := context.Conf("rpc.server.url", "RPC_SERVER_URL", true)
+	nc := rpc.NewClient(rpcUrl, context.Name)
+	context.UserRpcClient(nc)
+	if context.IsTestEnv() && context.Name != AccountServiceId {
+		srv := AccountRpc{client: context.GetRpcClient()}
+		srv.Serve(new(TestAccounRpcServerImpl))
 	}
-}
-
-func ConfigureRouter(router *sf.AppRouter) {
 	jwtSecret := router.App.Conf("jwt.secret", "JWT_SECRET", true)
 
-	if router.App.Name == "bantu-accounts" {
+	if router.App.Name == AccountServiceId{
 		router.SetJwtSettings(jwtSecret, "account")
 	} else {
 		router.JwtAuth()
@@ -103,17 +96,18 @@ func ConfigureRouter(router *sf.AppRouter) {
 	}
 }
 
-func BrokerInfo(app *sf.ApplicationContext, handler sf.MessageHandler, tenant bool) sf.BrokerInfo {
-	brokerUrl := app.Conf("amqp.url", "AMQP_URL", true)
+
+func BrokerInfo(context *sf.ApplicationContext, handler sf.MessageHandler, tenant bool) sf.BrokerInfo {
+	brokerUrl := context.Conf("amqp.url", "AMQP_URL", true)
 	if tenant {
 		handler = WrapMessageHandler(handler)
 	}
-	if handler == nil {
+	if h.IsNil(handler) {
 		log.Fatal("No handler was provided")
 	}
 	return sf.BrokerInfo{
 		Url:      brokerUrl,
-		Queue:    app.Name,
+		Queue:    context.Name,
 		Exchange: ExchangeName,
 		Handler:  handler,
 	}
@@ -137,7 +131,7 @@ func WithActiveTenant(req sf.Request, res sf.Response, cb func(ds sf.DbLink)) {
 	}
 }
 
- func WrapMessageHandler(handler sf.MessageHandler) sf.MessageHandler {
+func WrapMessageHandler(handler sf.MessageHandler) sf.MessageHandler {
 	return func(context *sf.ApplicationContext, message sf.Message) error {
 		if EventAccountApplicationCreated == message.Event {
 
