@@ -2,151 +2,99 @@ package bantu
 
 import (
 	"github.com/go-gormigrate/gormigrate/v2"
-	sf "github.com/soffa-io/soffa-core-go"
-	"github.com/soffa-io/soffa-core-go/h"
-	"github.com/soffa-io/soffa-core-go/log"
-	"github.com/soffa-io/soffa-core-go/rpc"
-	"github.com/stretchr/testify/assert"
-	"os"
+	"github.com/soffa-io/soffa-core-go"
+	"github.com/soffa-io/soffa-core-go/broker"
+	"github.com/soffa-io/soffa-core-go/conf"
+	sf "github.com/soffa-io/soffa-core-go/counters"
+	"github.com/soffa-io/soffa-core-go/db"
+	"github.com/soffa-io/soffa-core-go/errors"
+	"github.com/soffa-io/soffa-core-go/http"
 	"strings"
-	"testing"
 )
 
-type Opts struct {
-	//MessageHandler   sf.MessageHandler
-	NoDatabase       bool
-	Migrations       []*gormigrate.Migration
-	TenantMigrations []*gormigrate.Migration
-	TenantsDb        bool
-	//ConfigureRpc     func(client *rpc.client)
-	//CreateBroker     bool
-}
-
-type Refs struct {
-	EntityManager        *sf.DbLink
-	TenantsEntityManager *sf.DbLink
-	Broker               *sf.MessageBroker
-	RpcClient            *rpc.Client
-}
+var (
+	ApplicationAudience = "application"
+	AccountAudience     = "account"
+)
 
 var (
 	TenantMigrationsCounter sf.Counter
-	//primary                      sf.DbLink
 )
 
+type Module struct {
+	Db         *db.Link
+	accountRpc *AccountRpc
+	Broker     broker.Client
+	Cfg        *conf.Manager
+}
 
-func CreateDbLinks(context *sf.ApplicationContext, mainMigrations []*gormigrate.Migration, tenantsMigrations []*gormigrate.Migration) []*sf.DbLink {
+func NewModule(db *db.Link, broker broker.Client) *Module {
+	return &Module{Db: db, Broker: broker}
+}
 
-	var dbLinks []*sf.DbLink
+func (b *Module) CreateAccountRpc(handler AccountRpcServer) {
+	b.accountRpc = &AccountRpc{client: b.Broker}
+	b.accountRpc.Serve(handler)
+}
 
-	if mainMigrations != nil {
-		databaseUrl := context.Conf("db.url", "DATABASE_URL", true)
+func (b *Module) GetAccountRpc() *AccountRpc {
+	return b.accountRpc
+}
 
-		primary := &sf.DbLink{
-			ServiceName: strings.TrimPrefix(context.Name, "bantu-"),
-			Name:        PrimaryDbId,
-			Url:         databaseUrl,
-			Migrations:  mainMigrations,
-			//TenantsLoader: loader,
+func (b *Module) TenantsLoader() []string {
+	var tenants []string
+	t, err := b.accountRpc.GetTenantsList()
+	tenants = t
+	errors.Raise(err)
+	return tenants
+}
+
+func (b *Module) ApplyTenantMigrations(msg broker.Message) interface{} {
+	var application Application
+	errors.Raise(msg.Decode(&application))
+	b.Db.MigrateTenant(application.Id)
+	TenantMigrationsCounter.OK()
+	return nil
+}
+
+func CreateDefault(name string, version string, tenantService bool, env string, migrations []*gormigrate.Migration) (*soffa.App, *Module) {
+	cfg := conf.UseDefault(env)
+
+	bm := &Module{Cfg: cfg}
+
+	app := soffa.NewApp(cfg, name, version)
+
+	app.UseBroker(func(client broker.Client) {
+		bm.Broker = client
+		bm.CreateAccountRpc(nil)
+		app.SetArg("bantu.module", bm)
+		if tenantService {
+			client.Subscribe(EventAccountApplicationCreated, bm.ApplyTenantMigrations)
 		}
-		dbLinks = append(dbLinks, primary)
-	}
-
-	tenantsDbUrl := context.Conf("db.tenants_url", "TENANTS_DATABASE_URL", context.Name != "bantu-gateway")
-
-	if !h.IsEmpty(tenantsDbUrl) {
-		var tenantsLoader sf.TenantsLoaderFn
-
-		if tenantsMigrations != nil {
-			tenantsLoader = func() ([]string, error) {
-				accountRpc := GetAccountRpc(context)
-				return accountRpc.GetTenantsList()
-			}
-		}
-
-		tenants := &sf.DbLink{
-			ServiceName:   strings.TrimPrefix(context.Name, "bantu-"),
-			Name:          TenantsDbId,
-			Url:           tenantsDbUrl,
-			Migrations:    tenantsMigrations,
-			TenantsLoader: tenantsLoader,
-		}
-		dbLinks = append(dbLinks, tenants)
-	}
-
-	return dbLinks
-
-}
-
-func Init(context *sf.ApplicationContext, router *sf.Router) {
-	rpcUrl := context.Conf("rpc.server.url", "RPC_SERVER_URL", true)
-	nc := rpc.NewClient(rpcUrl, context.Name)
-	context.UserRpcClient(nc)
-	if context.IsTestEnv() && context.Name != AccountServiceId {
-		srv := AccountRpc{client: context.GetRpcClient()}
-		srv.Serve(new(TestAccounRpcServerImpl))
-	}
-	jwtSecret := router.App.Conf("jwt.secret", "JWT_SECRET", true)
-
-	if router.App.Name == AccountServiceId{
-		router.SetJwtSettings(jwtSecret, "account")
-	} else {
-		router.JwtAuth()
-		router.SetJwtSettings(jwtSecret, "application")
-	}
-}
-
-
-func BrokerInfo(context *sf.ApplicationContext, handler sf.MessageHandler, tenant bool) sf.BrokerInfo {
-	brokerUrl := context.Conf("amqp.url", "AMQP_URL", true)
-	if tenant {
-		handler = WrapMessageHandler(handler)
-	}
-	if h.IsNil(handler) {
-		log.Fatal("No handler was provided")
-	}
-	return sf.BrokerInfo{
-		Url:      brokerUrl,
-		Queue:    context.Name,
-		Exchange: ExchangeName,
-		Handler:  handler,
-	}
-}
-
-func CreateTestBearerToken(t *testing.T, subject string, audience string) string {
-	secret := os.Getenv("JWT_SECRET")
-	sf.AssertNotEmpty(secret, "JWT_SECRET is missing")
-	token, err := sf.CreateJwt(secret, "bantu", subject, audience, sf.H{})
-	assert.Nil(t, err)
-	return token
-}
-
-func WithActiveTenant(req sf.Request, res sf.Response, cb func(ds sf.DbLink)) {
-	err := req.Context.GetDbLink(TenantsDbId).WithTenant(req.Auth().Username, func(ds sf.DbLink) error {
-		cb(ds)
-		return nil
 	})
-	if err != nil {
-		res.Send(nil, err)
+
+	if migrations != nil {
+		prefix := strings.ReplaceAll(strings.TrimPrefix(strings.ToLower(name), "bantu-"), "-", "_")
+		app.UseDB(func(m *db.Manager) {
+			ds := db.DS{
+				Url:         cfg.Require("db.url", "DATABASE_URL"),
+				TablePrefix: prefix + "_",
+				Migrations:  migrations,
+			}
+			if tenantService {
+				ds.TenantsLoader = bm.TenantsLoader
+			}
+			m.Add(ds)
+			bm.Db = m.GetLink()
+		})
 	}
+
+	return app, bm
 }
 
-func WrapMessageHandler(handler sf.MessageHandler) sf.MessageHandler {
-	return func(context *sf.ApplicationContext, message sf.Message) error {
-		if EventAccountApplicationCreated == message.Event {
-
-			var event ApplicationCreated
-			if err := sf.Convert(message.Payload, &event); err != nil {
-				return err
-			}
-			db := context.GetDbLink(TenantsDbId)
-			err := db.Migrate(&event.Application.Id)
-			_ = TenantMigrationsCounter.Record(err)
-			return err
-
-		} else if handler != nil {
-			return handler(context, message)
-		}
-		return nil
-	}
+func (b *Module) EnableJwt(router *http.Router, audience string) {
+	router.Use(http.JwtBearerFilter{
+		Secret:   b.Cfg.Require("jwt.secret", "JWT_SECRET"),
+		Audience: audience,
+	})
 }

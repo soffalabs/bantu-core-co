@@ -1,10 +1,10 @@
 package bantu
 
 import (
-	sf "github.com/soffa-io/soffa-core-go"
+	"github.com/soffa-io/soffa-core-go/broker"
+	"github.com/soffa-io/soffa-core-go/errors"
 	"github.com/soffa-io/soffa-core-go/h"
 	"github.com/soffa-io/soffa-core-go/log"
-	"github.com/soffa-io/soffa-core-go/rpc"
 	"strings"
 	"time"
 )
@@ -105,49 +105,54 @@ type GetApplicationListOutput struct {
 }
 
 type AccountRpc struct {
-	client rpc.Client
+	client broker.Client
 }
 
 type AccountRpcServer interface {
-	FindAccountByKey(key string) (*Account, error)
-	FindApplicationByKey(key string) (*Application, error)
-	GetTenantsList() ([]string, error)
+	FindAccountByKey(key string) *Account
+	FindApplicationByKey(key string) *Application
+	GetTenantsList() []string
 }
 
 // *********************************************************************************************************************
 
-func GetAccountRpc(context *sf.ApplicationContext) AccountRpc{
-	return AccountRpc{client: context.GetRpcClient()}
+func NewAccountRpc(client broker.Client, impl AccountRpcServer) *AccountRpc {
+	a := &AccountRpc{client :client}
+	if impl != nil {
+		a.Serve(impl)
+	}
+	return a
 }
-
 
 func (a AccountRpc) Serve(impl AccountRpcServer) {
 
-	a.client.ServeAll([]string{FindAccountByKey, FindApplicationByKey}, func(op string, data []byte) (interface{}, error) {
+	fn := func(op string, msg broker.Message) interface{} {
 		var input map[string]interface{}
-		if err := h.DecodeBytes(data, &input); err != nil {
-			return nil, err
-		}
+		err := msg.Decode(&input)
+		errors.Raise(err)
 		key := input["key"].(string)
 		if op == FindAccountByKey {
 			return impl.FindAccountByKey(key)
 		} else {
 			return impl.FindApplicationByKey(key)
 		}
+	}
+
+	a.client.Subscribe(FindAccountByKey, func(msg broker.Message) interface{} {
+		return fn(FindAccountByKey, msg)
 	})
-	a.client.Serve(GetTenantsList, func(_ string, _ []byte) (interface{}, error) {
+	a.client.Subscribe(FindApplicationByKey, func(msg broker.Message) interface{} {
+		return fn(FindApplicationByKey, msg)
+	})
+	a.client.Subscribe(GetTenantsList, func(msg broker.Message) interface{} {
 		return impl.GetTenantsList()
 	})
 
 }
 
-func NewAccountRpcClient(ctx *sf.ApplicationContext) AccountRpc {
-	return AccountRpc{client: ctx.GetRpcClient()}
-}
-
 func (a AccountRpc) FindAccountByKey(key string) (*Account, error) {
 	var result *Account
-	err := a.client.Request(FindAccountByKey, sf.H{"key": key}, &result)
+	err := a.client.Request(FindAccountByKey, h.Map{"key": key}, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +161,7 @@ func (a AccountRpc) FindAccountByKey(key string) (*Account, error) {
 
 func (a AccountRpc) FindApplicationByKey(key string) (*Application, error) {
 	var result *Application
-	err := a.client.Request(FindApplicationByKey, sf.H{"key": key}, &result)
+	err := a.client.Request(FindApplicationByKey, h.Map{"key": key}, &result)
 	if err != nil {
 		log.Error(err)
 	}
@@ -168,41 +173,6 @@ func (a AccountRpc) FindApplicationByKey(key string) (*Application, error) {
 
 func (a AccountRpc) GetTenantsList() ([]string, error) {
 	var tenants []string
-	err := a.client.Request(GetTenantsList, sf.H{}, &tenants)
+	err := a.client.Request(GetTenantsList, nil, &tenants)
 	return tenants, err
 }
-
-type TestAccounRpcServerImpl struct {
-	AccountRpcServer
-}
-
-func (s TestAccounRpcServerImpl) FindAccountByKey(key string) (*Account, error) {
-	if key == TestAccountApiKey {
-		return &Account{
-			Id:        "acc_001",
-			Name:      "Test",
-			ApiKey:    key,
-			CreatedAt: time.Now(),
-		}, nil
-	}
-	return nil, nil
-}
-
-func (s TestAccounRpcServerImpl) FindApplicationByKey(key string) (*Application, error) {
-	if key == TestApplicationKeyTest || key == TestApplicationKeyLive {
-		return &Application{
-			Id:         "app_001",
-			Name:       "Test",
-			ApiKeyLive: key,
-			ApiKeyTest: key,
-			CreatedAt:  time.Now(),
-		}, nil
-	}
-	return nil, nil
-}
-
-func (s TestAccounRpcServerImpl) GetTenantsList() ([]string, error) {
-	return []string{"app_001"}, nil
-}
-
-

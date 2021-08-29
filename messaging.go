@@ -19,11 +19,12 @@ type Email struct {
 }
 
 type SendEmailInput struct {
-	From         EmailAddress `json:"from" binding:"required"`
-	Subject      string       `json:"subject" binding:"required"`
-	To           EmailAddress `json:"to" binding:"required"`
-	PlainContent string       `json:"plain_content"`
-	HtmlContent  string       `json:"html_content"`
+	Metas        map[string]interface{} `json:"metas"`
+	From         EmailAddress           `json:"from" binding:"required"`
+	Subject      string                 `json:"subject" binding:"required"`
+	To           EmailAddress           `json:"to" binding:"required"`
+	PlainContent string                 `json:"plain_content"`
+	HtmlContent  string                 `json:"html_content"`
 }
 
 type SendEmailOutout struct {
