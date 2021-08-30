@@ -53,9 +53,9 @@ func (b *Module) TenantsLoader() []string {
 }
 
 func (b *Module) ApplyTenantMigrations(msg broker.Message) interface{} {
-	var application Application
-	errors.Raise(msg.Decode(&application))
-	b.Db.MigrateTenant(application.Id)
+	var event = new(ApplicationCreated)
+	errors.Raise(msg.Decode(&event))
+	b.Db.MigrateTenant(event.Application.Id)
 	return nil
 }
 

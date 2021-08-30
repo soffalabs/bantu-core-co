@@ -52,3 +52,5 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gorm.io/gorm v1.21.14
 )
+
+replace github.com/soffa-io/soffa-core-go => ../soffa-core
