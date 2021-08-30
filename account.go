@@ -117,7 +117,7 @@ type AccountRpcServer interface {
 // *********************************************************************************************************************
 
 func NewAccountRpc(client broker.Client, impl AccountRpcServer) *AccountRpc {
-	a := &AccountRpc{client :client}
+	a := &AccountRpc{client: client}
 	if impl != nil {
 		a.Serve(impl)
 	}
@@ -145,6 +145,10 @@ func (a *AccountRpc) Serve(impl AccountRpcServer) {
 		return fn(FindApplicationByKey, msg)
 	})
 	a.client.Subscribe(GetTenantsList, func(msg broker.Message) interface{} {
+		if impl == nil {
+			log.Error("No account rpc implement was provided.")
+			return nil
+		}
 		return impl.GetTenantsList()
 	})
 

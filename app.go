@@ -26,10 +26,12 @@ type Module struct {
 	accountRpc *AccountRpc
 	Broker     broker.Client
 	Cfg        *conf.Manager
+	accountRpcImpl AccountRpcServer
 }
 
-func NewModule(db *db.Link, broker broker.Client) *Module {
-	return &Module{Db: db, Broker: broker}
+
+func (b *Module) SetAccountRpcImpl(handler AccountRpcServer) {
+	b.accountRpcImpl = handler
 }
 
 func (b *Module) CreateAccountRpc(handler AccountRpcServer) {
@@ -60,22 +62,26 @@ func (b *Module) ApplyTenantMigrations(msg broker.Message) interface{} {
 	return nil
 }
 
-func CreateDefault(name string, version string, tenantService bool, env string, migrations []*gormigrate.Migration) (*soffa.App, *Module) {
+func CreateDefault(name string, version string, env string, migrations []*gormigrate.Migration) (*soffa.App, *Module) {
 	cfg := conf.UseDefault(env)
 
 	bm := &Module{Cfg: cfg}
 
 	app := soffa.NewApp(cfg, name, version)
 
+	isAccountService := name == "bantu-accounts"
+
 	app.UseBroker(func(client broker.Client) {
 		bm.Broker = client
-		if cfg.IsTestEnv() {
-			bm.CreateAccountRpc(new(TestAccounRpcServerImpl))
-		}else {
-			bm.CreateAccountRpc(nil)
+		if !isAccountService {
+			if cfg.IsTestEnv() {
+				bm.CreateAccountRpc(new(TestAccounRpcServerImpl))
+			} else {
+				bm.CreateAccountRpc(nil)
+			}
 		}
 		app.SetArg("bantu.module", bm)
-		if tenantService {
+		if !isAccountService {
 			client.Subscribe(EventAccountApplicationCreated, bm.ApplyTenantMigrations)
 		}
 	})
@@ -88,7 +94,7 @@ func CreateDefault(name string, version string, tenantService bool, env string, 
 				TablePrefix: prefix + "_",
 				Migrations:  migrations,
 			}
-			if tenantService {
+			if !isAccountService {
 				ds.TenantsLoader = bm.TenantsLoader
 			}
 			m.Add(ds)
