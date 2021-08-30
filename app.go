@@ -5,10 +5,11 @@ import (
 	"github.com/soffa-io/soffa-core-go"
 	"github.com/soffa-io/soffa-core-go/broker"
 	"github.com/soffa-io/soffa-core-go/conf"
-	sf "github.com/soffa-io/soffa-core-go/counters"
+	"github.com/soffa-io/soffa-core-go/counters"
 	"github.com/soffa-io/soffa-core-go/db"
 	"github.com/soffa-io/soffa-core-go/errors"
 	"github.com/soffa-io/soffa-core-go/http"
+	"github.com/soffa-io/soffa-core-go/log"
 	"strings"
 )
 
@@ -18,7 +19,7 @@ var (
 )
 
 var (
-	TenantMigrationsCounter sf.Counter
+	TenantMigrationsCounter counters.Counter
 )
 
 type Module struct {
@@ -65,6 +66,8 @@ func (b *Module) ApplyTenantMigrations(msg broker.Message) interface{} {
 }
 
 func CreateDefault(name string, version string, env string, migrations []*gormigrate.Migration) (*soffa.App, *Module) {
+	log.Application = name
+
 	cfg := conf.UseDefault(env)
 
 	bm := &Module{Cfg: cfg}

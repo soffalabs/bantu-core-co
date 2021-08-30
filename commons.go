@@ -72,7 +72,7 @@ func (j *Job) Success() {
 func (j *Job) Fail(msg string) {
 	j.Status = "failed"
 	j.Error = msg
-	log.Error("a job as failed: %s -- %s", j.Id, msg)
+	log.Default.Error("a job as failed: %s -- %s", j.Id, msg)
 }
 
 func (j *Job) Failf(format string, args ...interface{}) {
@@ -87,14 +87,14 @@ func (j *Job) Retry(msg string) {
 		j.Fail(msg)
 		j.Status = "exhausted"
 	} else {
-		log.Warnf("a job is going to be retried: %s -- %s", j.Id, msg)
+		log.Default.Warnf("a job is going to be retried: %s -- %s", j.Id, msg)
 	}
 }
 
 func (j *Job) GetPayload(dest interface{}) {
 	if !h.IsEmpty(j.Payload) {
 		if err := h.FromJsonStr(j.Payload, dest); err != nil {
-			log.Wrap(err, "error deserializaing job data. Is it a json ?")
+			log.Default.Wrap(err, "error deserializaing job data. Is it a json ?")
 		}
 	}
 }

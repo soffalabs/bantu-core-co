@@ -5,6 +5,7 @@ go 1.16
 require (
 	github.com/andybalholm/brotli v1.0.3 // indirect
 	github.com/cenkalti/backoff/v3 v3.2.2 // indirect
+	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/gin-gonic/gin v1.7.4 // indirect
 	github.com/go-gormigrate/gormigrate/v2 v2.0.0
 	github.com/go-openapi/jsonreference v0.19.6 // indirect
@@ -19,15 +20,17 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.0 // indirect
 	github.com/imkira/go-interpol v1.1.0 // indirect
 	github.com/jackc/pgx/v4 v4.13.0 // indirect
-	github.com/json-iterator/go v1.1.11 // indirect
+	github.com/klauspost/compress v1.13.5 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/minio/highwayhash v1.0.2 // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/nats-io/nats-server/v2 v2.3.4 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
+	github.com/prometheus/common v0.30.0 // indirect
+	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
-	github.com/soffa-io/soffa-core-go v0.1.11
+	github.com/soffa-io/soffa-core-go v0.2.0
 	github.com/swaggo/swag v1.7.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/ugorji/go v1.2.6 // indirect

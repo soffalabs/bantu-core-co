@@ -127,7 +127,7 @@ func NewAccountRpc(client broker.Client, impl AccountRpcServer) *AccountRpc {
 func (a *AccountRpc) Serve(impl AccountRpcServer) {
 
 	if impl == nil {
-		log.Fatal("AccountRpc impl cannot be nul")
+		log.Default.Fatal("AccountRpc impl cannot be nul")
 	}
 
 	fn := func(op string, msg broker.Message) interface{} {
@@ -167,7 +167,7 @@ func (a *AccountRpc) FindApplicationByKey(key string) (*Application, error) {
 	var result *Application
 	err := a.client.Request(FindApplicationByKey, h.Map{"key": key}, &result)
 	if err != nil {
-		log.Error(err)
+		log.Default.Error(err)
 	}
 	if err != nil || h.IsNil(result) {
 		return nil, err
