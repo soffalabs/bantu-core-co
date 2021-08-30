@@ -5,7 +5,6 @@ import (
 	"github.com/soffa-io/soffa-core-go"
 	"github.com/soffa-io/soffa-core-go/broker"
 	"github.com/soffa-io/soffa-core-go/conf"
-	"github.com/soffa-io/soffa-core-go/counters"
 	"github.com/soffa-io/soffa-core-go/db"
 	"github.com/soffa-io/soffa-core-go/errors"
 	"github.com/soffa-io/soffa-core-go/http"
@@ -16,10 +15,6 @@ import (
 var (
 	ApplicationAudience = "application"
 	AccountAudience     = "account"
-)
-
-var (
-	TenantMigrationsCounter counters.Counter
 )
 
 type Module struct {
@@ -61,7 +56,6 @@ func (b *Module) ApplyTenantMigrations(msg broker.Message) interface{} {
 	var application Application
 	errors.Raise(msg.Decode(&application))
 	b.Db.MigrateTenant(application.Id)
-	TenantMigrationsCounter.OK()
 	return nil
 }
 

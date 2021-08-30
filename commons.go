@@ -39,9 +39,9 @@ func (r *JobRepo) Transactional(cb func(repo JobRepo)) {
 	})
 }
 
-func (r *JobRepo) CatchErr(job Job) {
-	if err := recover(); err != nil {
-		job.Retry((err.(error)).Error())
+func (r *JobRepo) CatchErr(job Job, any interface{}) {
+	if any != nil {
+		job.Retry((any.(error)).Error())
 		r.Update(job)
 	}
 }

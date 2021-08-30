@@ -30,7 +30,7 @@ require (
 	github.com/prometheus/common v0.30.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
-	github.com/soffa-io/soffa-core-go v0.2.0
+	github.com/soffa-io/soffa-core-go v0.2.2
 	github.com/swaggo/swag v1.7.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/ugorji/go v1.2.6 // indirect
@@ -52,5 +52,3 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gorm.io/gorm v1.21.14
 )
-
-//replace github.com/soffa-io/soffa-core-go => ../soffa-core
