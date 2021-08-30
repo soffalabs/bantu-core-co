@@ -27,7 +27,7 @@ require (
 	github.com/nats-io/nats-server/v2 v2.3.4 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
-	github.com/soffa-io/soffa-core-go v0.1.10
+	github.com/soffa-io/soffa-core-go v0.1.11
 	github.com/swaggo/swag v1.7.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/ugorji/go v1.2.6 // indirect
