@@ -10,10 +10,6 @@ const (
 )
 
 
-func (b *Module) EnableAccountRpcMock() {
-	b.GetAccountRpc().Serve(TestAccounRpcServerImpl{})
-}
-
 type TestAccounRpcServerImpl struct {
 	AccountRpcServer
 }

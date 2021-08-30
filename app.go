@@ -45,6 +45,9 @@ func (b *Module) TenantsLoader() []string {
 	var tenants []string
 	t, err := b.accountRpc.GetTenantsList()
 	tenants = t
+	if tenants == nil {
+		tenants = []string{}
+	}
 	errors.Raise(err)
 	return tenants
 }
@@ -66,7 +69,11 @@ func CreateDefault(name string, version string, tenantService bool, env string, 
 
 	app.UseBroker(func(client broker.Client) {
 		bm.Broker = client
-		bm.CreateAccountRpc(nil)
+		if cfg.IsTestEnv() {
+			bm.CreateAccountRpc(new(TestAccounRpcServerImpl))
+		}else {
+			bm.CreateAccountRpc(nil)
+		}
 		app.SetArg("bantu.module", bm)
 		if tenantService {
 			client.Subscribe(EventAccountApplicationCreated, bm.ApplyTenantMigrations)

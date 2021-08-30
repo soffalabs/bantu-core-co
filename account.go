@@ -124,7 +124,7 @@ func NewAccountRpc(client broker.Client, impl AccountRpcServer) *AccountRpc {
 	return a
 }
 
-func (a AccountRpc) Serve(impl AccountRpcServer) {
+func (a *AccountRpc) Serve(impl AccountRpcServer) {
 
 	fn := func(op string, msg broker.Message) interface{} {
 		var input map[string]interface{}
@@ -150,7 +150,7 @@ func (a AccountRpc) Serve(impl AccountRpcServer) {
 
 }
 
-func (a AccountRpc) FindAccountByKey(key string) (*Account, error) {
+func (a *AccountRpc) FindAccountByKey(key string) (*Account, error) {
 	var result *Account
 	err := a.client.Request(FindAccountByKey, h.Map{"key": key}, &result)
 	if err != nil {
@@ -159,7 +159,7 @@ func (a AccountRpc) FindAccountByKey(key string) (*Account, error) {
 	return result, nil
 }
 
-func (a AccountRpc) FindApplicationByKey(key string) (*Application, error) {
+func (a *AccountRpc) FindApplicationByKey(key string) (*Application, error) {
 	var result *Application
 	err := a.client.Request(FindApplicationByKey, h.Map{"key": key}, &result)
 	if err != nil {
@@ -171,7 +171,7 @@ func (a AccountRpc) FindApplicationByKey(key string) (*Application, error) {
 	return result, nil
 }
 
-func (a AccountRpc) GetTenantsList() ([]string, error) {
+func (a *AccountRpc) GetTenantsList() ([]string, error) {
 	var tenants []string
 	err := a.client.Request(GetTenantsList, nil, &tenants)
 	return tenants, err
