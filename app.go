@@ -36,7 +36,9 @@ func (b *Module) SetAccountRpcImpl(handler AccountRpcServer) {
 
 func (b *Module) CreateAccountRpc(handler AccountRpcServer) {
 	b.accountRpc = &AccountRpc{client: b.Broker}
-	b.accountRpc.Serve(handler)
+	if handler != nil {
+		b.accountRpc.Serve(handler)
+	}
 }
 
 func (b *Module) GetAccountRpc() *AccountRpc {
