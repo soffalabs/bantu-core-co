@@ -18,7 +18,6 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.0 // indirect
-	github.com/imkira/go-interpol v1.1.0 // indirect
 	github.com/jackc/pgx/v4 v4.13.0 // indirect
 	github.com/klauspost/compress v1.13.5 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
@@ -30,13 +29,12 @@ require (
 	github.com/prometheus/common v0.30.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
-	github.com/soffa-io/soffa-core-go v0.2.2
+	github.com/soffa-io/soffa-core-go v0.2.3
 	github.com/swaggo/swag v1.7.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/ugorji/go v1.2.6 // indirect
 	github.com/valyala/fasthttp v1.29.0 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
-	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/xo/dburl v0.8.5 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.7.0 // indirect
@@ -53,4 +51,4 @@ require (
 	gorm.io/gorm v1.21.14
 )
 
-replace github.com/soffa-io/soffa-core-go => ../soffa-core
+//replace github.com/soffa-io/soffa-core-go => ../soffa-core

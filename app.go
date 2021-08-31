@@ -7,8 +7,10 @@ import (
 	"github.com/soffa-io/soffa-core-go/conf"
 	"github.com/soffa-io/soffa-core-go/db"
 	"github.com/soffa-io/soffa-core-go/errors"
+	"github.com/soffa-io/soffa-core-go/h"
 	"github.com/soffa-io/soffa-core-go/http"
 	"github.com/soffa-io/soffa-core-go/log"
+	"github.com/soffa-io/soffa-core-go/sentry"
 	"strings"
 )
 
@@ -25,6 +27,9 @@ type Module struct {
 	accountRpcImpl AccountRpcServer
 }
 
+type IdURIModel struct {
+	Id  string  `json:"id" bindind:"required" uri:"id"`
+}
 
 func (b *Module) SetAccountRpcImpl(handler AccountRpcServer) {
 	b.accountRpcImpl = handler
@@ -63,6 +68,10 @@ func CreateDefault(name string, version string, env string, migrations []*gormig
 	log.Application = name
 
 	cfg := conf.UseDefault(env)
+	dsn := cfg.Get("sentry.dsn", "SENTRY_DSN")
+	if !h.IsEmpty(dsn) && cfg.IsProdEnv(){
+		sentry.Init(dsn, name, version)
+	}
 
 	bm := &Module{Cfg: cfg}
 
