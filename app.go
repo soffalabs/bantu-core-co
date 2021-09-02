@@ -113,9 +113,12 @@ func CreateDefault(name string, version string, env string, migrations []*gormig
 	return app, bm
 }
 
-func (b *Module) EnableJwt(router *http.Router, audience string) {
-	router.Use(http.JwtBearerFilter{
+func (b *Module) EnableJwt(router *http.Router, audience string) *http.JwtBearerFilter {
+	filter := &http.JwtBearerFilter{
 		Secret:   b.Cfg.Require("jwt.secret", "JWT_SECRET"),
 		Audience: audience,
-	})
+	}
+	router.Use(filter)
+	return filter
 }
+
