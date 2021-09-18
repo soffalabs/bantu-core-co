@@ -33,6 +33,7 @@ func NewJobRepo(link *db.Link) *JobRepo {
 	return &JobRepo{link: link}
 }
 
+
 func (r *JobRepo) Transactional(cb func(repo JobRepo)) {
 	r.link.Transactional(func(link *db.Link) {
 		cb(JobRepo{link: link})
@@ -124,3 +125,5 @@ func WithJobMigrations(migrations []*gormigrate.Migration) []*gormigrate.Migrati
 	}}
 	return append(migrations, mig[:]...)
 }
+
+

@@ -20,15 +20,16 @@ var (
 )
 
 type Module struct {
-	Db         *db.Link
-	accountRpc *AccountRpc
-	Broker     broker.Client
-	Cfg        *conf.Manager
+	Db             *db.Link
+	accountRpc     *AccountRpc
+	Broker         broker.Client
+	Cfg            *conf.Manager
+	TimeSeries     db.TimeSeries
 	accountRpcImpl AccountRpcServer
 }
 
 type IdURIModel struct {
-	Id  string  `json:"id" bindind:"required" uri:"id"`
+	Id string `json:"id" bindind:"required" uri:"id"`
 }
 
 func (b *Module) SetAccountRpcImpl(handler AccountRpcServer) {
@@ -69,7 +70,7 @@ func CreateDefault(name string, version string, env string, migrations []*gormig
 
 	cfg := conf.UseDefault(env)
 	dsn := cfg.Get("sentry.dsn", "SENTRY_DSN")
-	if !h.IsEmpty(dsn) && cfg.IsProdEnv(){
+	if !h.IsEmpty(dsn) && cfg.IsProdEnv() {
 		sentry.Init(dsn, name, version)
 	}
 
@@ -78,6 +79,16 @@ func CreateDefault(name string, version string, env string, migrations []*gormig
 	app := soffa.NewApp(cfg, name, version)
 
 	isAccountService := name == "bantu-accounts"
+
+	url := cfg.Get("influxdb.url", "INFLUXB_URL")
+	if !h.IsStrEmpty(url) {
+		log.Default.Info("InfluxDB found")
+		token := cfg.Require("influxdb.token", "INFLUXB_TOKEN")
+		org := cfg.Require("influxdb.org", "INFLUXB_ORG")
+		bm.TimeSeries = db.NewInfluxDBClient(url, token, org, name)
+	}else {
+		log.Default.Warn("No timeseries connexion found")
+	}
 
 	app.UseBroker(func(client broker.Client) {
 		bm.Broker = client
@@ -121,4 +132,3 @@ func (b *Module) EnableJwt(router *http.Router, audience string) *http.JwtBearer
 	router.Use(filter)
 	return filter
 }
-
